@@ -27,9 +27,9 @@ Copy `.env.example` to `.env` and fill in your Discord bot token:
 
 ```env
 DISCORD_TOKEN=replace-me
-HELIX_BASE_URL=https://helix.unifiedkings.net
+HELIX_BASE_URL=https://your.helix.url
 HELIXBOT_DB_PATH=/data/helixbot.sqlite3
-HELIXBOT_VOLUME=0.10
+HELIXBOT_VOLUME=0.1
 DISCORD_DEV_GUILD_ID=
 LOG_LEVEL=INFO
 ```
