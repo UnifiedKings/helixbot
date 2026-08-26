@@ -36,8 +36,18 @@ class HelixBot(commands.Bot):
             guild = discord.Object(id=self.settings.dev_guild_id)
             self.tree.copy_global_to(guild=guild)
             await self.tree.sync(guild=guild)
+
+            # Development-guild mode is exclusive. Remove any previously
+            # registered global commands so Discord does not show both the
+            # global and guild-scoped copies while developing.
+            self.tree.clear_commands(guild=None)
+            await self.tree.sync()
+
             self._commands_synced = True
-            LOG.info("Synced slash commands to development guild %s", self.settings.dev_guild_id)
+            LOG.info(
+                "Synced slash commands only to development guild %s and cleared global commands",
+                self.settings.dev_guild_id,
+            )
         else:
             await self.tree.sync()
             self._commands_synced = True

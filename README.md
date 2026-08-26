@@ -94,3 +94,9 @@ docker compose logs -f helixbot
 The SQLite database is stored in `./data` on the host through the Compose volume.
 
 Once the container is online and Discord has registered the slash commands, type `/helix` in your Discord server to see the available HelixBot commands.
+
+## License
+
+HelixBot is licensed under the [GNU Affero General Public License v3.0](LICENSE) (**AGPL-3.0-only**).
+
+You may use, modify, and redistribute HelixBot under the terms of the AGPL. If you modify HelixBot and make that modified version available to users over a network, the corresponding source code must also be made available as required by the license.
