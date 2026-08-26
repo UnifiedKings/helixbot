@@ -1,0 +1,9 @@
+services:
+  helixbot:
+    build: .
+    container_name: helixdiscordbot
+    restart: unless-stopped
+    env_file:
+      - .env
+    volumes:
+      - ./data:/data
