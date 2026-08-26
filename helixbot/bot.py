@@ -62,12 +62,12 @@ class HelixCommands(commands.Cog):
     def _guild_id(self, interaction: discord.Interaction) -> int | None:
         return interaction.guild_id
 
-    @helix_group.command(name="join", description="Link this Discord server to a Helix lobby")
+    @helix_group.command(name="link", description="Link this Discord server to a Helix lobby")
     @app_commands.describe(
         code="Five-letter Helix lobby code",
         password="Lobby password, if the lobby is protected",
     )
-    async def join(self, interaction: discord.Interaction, code: str, password: str | None = None) -> None:
+    async def link(self, interaction: discord.Interaction, code: str, password: str | None = None) -> None:
         guild_id = self._guild_id(interaction)
         if guild_id is None or interaction.guild is None:
             await interaction.response.send_message("This command can only be used in a Discord server.", ephemeral=True)
@@ -124,7 +124,7 @@ class HelixCommands(commands.Cog):
 
         binding = await self.bot.storage.get_binding(guild_id)
         if binding is None:
-            await interaction.response.send_message("This server is not linked to a Helix lobby. Use `/helix join` first.", ephemeral=True)
+            await interaction.response.send_message("This server is not linked to a Helix lobby. Use `/helix link` first.", ephemeral=True)
             return
 
         member = interaction.user
@@ -249,6 +249,30 @@ class HelixCommands(commands.Cog):
                     protection,
                 ]
             )
+        )
+
+
+    @helix_group.command(name="help", description="Explain HelixBot and show available commands")
+    async def help(self, interaction: discord.Interaction) -> None:
+        await interaction.response.send_message(
+            "\n".join(
+                [
+                    "**HelixBot**",
+                    "HelixBot connects Discord voice to **Helix**, a self-hosted music system. In Helix, people can create **lobbies** — shared listening rooms where everyone hears the same queue and playback state.",
+                    "",
+                    "This Discord server can be linked to one Helix lobby. Once linked, HelixBot can join a voice channel and mirror whatever that lobby is currently playing. Helix remains in control of playback; HelixBot does not play, pause, skip, or seek the lobby from Discord.",
+                    "",
+                    "**Commands**",
+                    "`/helix link CODE [password]` — Link this Discord server to a Helix lobby.",
+                    "`/helix joinme` — Join your current voice channel and mirror the linked lobby.",
+                    "`/helix leaveme` — Leave Discord voice without unlinking the lobby.",
+                    "`/helix invite` — Post the linked lobby's join code and invite link.",
+                    "`/helix status` — Show the linked lobby and current playback state.",
+                    "`/helix unlink` — Disconnect this Discord server from the Helix lobby.",
+                    "`/helix help` — Show this help message.",
+                ]
+            ),
+            ephemeral=True,
         )
 
     @helix_group.command(name="unlink", description="Remove this server's Helix lobby link")

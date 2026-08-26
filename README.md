@@ -7,7 +7,7 @@ Discord voice client for a self-hosted Helix instance.
 - Dockerized deployment.
 - Helix instance configured with `HELIX_BASE_URL` in `.env`.
 - Persistent Discord-server -> Helix-lobby association in SQLite.
-- `/helix join CODE [password]`
+- `/helix link CODE [password]` links this Discord server to a Helix lobby.
 - `/helix joinme` joins the invoking user's voice channel and mirrors the linked Helix lobby audio.
 - `/helix leaveme` leaves voice while preserving the lobby link.
 - Realtime lobby WebSocket subscription for track, pause/resume, seek, and queue-advance changes.
@@ -18,8 +18,22 @@ Discord voice client for a self-hosted Helix instance.
 - `/helix status` validates the saved Helix session and shows current lobby playback state.
 - `/helix invite` publicly shares the linked lobby's 5-letter code and join URL. Password-protected lobbies are marked as requiring a password, but the password is never included.
 - `/helix unlink` deactivates the bot's Helix guest membership and removes the saved association.
+- `/helix help` explains Helix, Helix lobbies, how HelixBot mirrors playback, and lists the available commands.
 
 Helix remains the source of truth for playback. HelixBot mirrors lobby state; it does not expose Discord commands that play, pause, seek, or skip the Helix lobby.
+
+
+## Commands
+
+HelixBot uses Helix lobbies as shared listening rooms. A Discord server links to one lobby, and HelixBot mirrors that lobby into Discord voice without taking control of playback.
+
+- `/helix link CODE [password]` — Link this Discord server to a Helix lobby.
+- `/helix joinme` — Join your current voice channel and mirror the linked lobby.
+- `/helix leaveme` — Leave Discord voice while keeping the lobby link.
+- `/helix invite` — Publicly post the linked lobby's join code and invite link. Password-protected lobbies are marked as requiring a password, but the password is never shared.
+- `/helix status` — Show the linked lobby, current playback state, and voice connection.
+- `/helix unlink` — Remove this Discord server's saved Helix lobby link.
+- `/helix help` — Explain HelixBot and show the command list.
 
 ## Configuration
 
