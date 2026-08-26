@@ -213,6 +213,44 @@ class HelixCommands(commands.Cog):
             ephemeral=True,
         )
 
+    @helix_group.command(name="invite", description="Share the linked Helix lobby invite")
+    async def invite(self, interaction: discord.Interaction) -> None:
+        guild_id = self._guild_id(interaction)
+        if guild_id is None or interaction.guild is None:
+            await interaction.response.send_message("This command can only be used in a Discord server.", ephemeral=True)
+            return
+
+        binding = await self.bot.storage.get_binding(guild_id)
+        if binding is None:
+            await interaction.response.send_message("This server is not linked to a Helix lobby.", ephemeral=True)
+            return
+
+        await interaction.response.defer(thinking=True)
+        try:
+            state = await self.bot.helix.get_lobby_state(binding.lobby_id, binding.guest_token)
+        except HelixError as exc:
+            await interaction.followup.send(
+                f"I couldn't validate the linked Helix lobby: {exc}",
+                ephemeral=True,
+            )
+            return
+
+        lobby_name = str(state.get("name") or "Shared Lobby")
+        has_password = bool(state.get("has_password"))
+        invite_url = f"{self.bot.settings.helix_base_url}/join/{binding.lobby_code}"
+        protection = "Password required." if has_password else "No password required — anyone with this link can join."
+
+        await interaction.followup.send(
+            "\n".join(
+                [
+                    f"**{lobby_name}**",
+                    f"Join code: `{binding.lobby_code}`",
+                    invite_url,
+                    protection,
+                ]
+            )
+        )
+
     @helix_group.command(name="unlink", description="Remove this server's Helix lobby link")
     async def unlink(self, interaction: discord.Interaction) -> None:
         guild_id = self._guild_id(interaction)

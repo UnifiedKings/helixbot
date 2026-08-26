@@ -16,6 +16,7 @@ Discord voice client for a self-hosted Helix instance.
 - Drift and explicit Helix seeks trigger automatic resynchronization.
 - Natural Discord track completion reports the specific queue item through Helix's idempotent `/ended` endpoint.
 - `/helix status` validates the saved Helix session and shows current lobby playback state.
+- `/helix invite` publicly shares the linked lobby's 5-letter code and join URL. Password-protected lobbies are marked as requiring a password, but the password is never included.
 - `/helix unlink` deactivates the bot's Helix guest membership and removes the saved association.
 
 Helix remains the source of truth for playback. HelixBot mirrors lobby state; it does not expose Discord commands that play, pause, seek, or skip the Helix lobby.
@@ -28,7 +29,7 @@ Copy `.env.example` to `.env` and fill in your Discord bot token:
 DISCORD_TOKEN=replace-me
 HELIX_BASE_URL=https://helix.unifiedkings.net
 HELIXBOT_DB_PATH=/data/helixbot.sqlite3
-HELIXBOT_VOLUME=0.40
+HELIXBOT_VOLUME=0.10
 DISCORD_DEV_GUILD_ID=
 LOG_LEVEL=INFO
 ```
@@ -37,7 +38,7 @@ LOG_LEVEL=INFO
 
 `DISCORD_DEV_GUILD_ID` is useful during development because guild-scoped slash commands update immediately. Leave it blank for normal global command registration.
 
-`HELIXBOT_VOLUME` controls the audio level HelixBot sends to Discord. The default is `0.40` (40%) so the bot does not join a channel at an unexpectedly loud level. Valid values are `0.0` through `1.0`. Individual Discord users can still adjust HelixBot locally on top of this server-side default.
+`HELIXBOT_VOLUME` controls the audio level HelixBot sends to Discord. The default is `0.10` (10%) so the bot does not join a channel at an unexpectedly loud level. Valid values are `0.0` through `1.0`. Individual Discord users can still adjust HelixBot locally on top of this server-side default.
 
 ## Discord application setup
 

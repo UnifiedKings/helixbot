@@ -22,6 +22,8 @@ LOG = logging.getLogger("helixbot.playback")
 DRIFT_RESTART_MS = 5_000
 RECONNECT_DELAY_SECONDS = 1.5
 STREAM_FAILURE_BACKOFF_SECONDS = 2.0
+SEEK_DEBOUNCE_SECONDS = 0.45
+SOURCE_TEARDOWN_GRACE_SECONDS = 0.10
 
 
 @dataclass
@@ -83,6 +85,9 @@ class GuildPlaybackSession:
         self._state_lock = asyncio.Lock()
         self._source_started_at = 0.0
         self._retry_not_before = 0.0
+        self._seek_task: asyncio.Task[None] | None = None
+        self._pending_seek_item_id = ""
+        self._pending_seek_position_ms = 0
 
     async def start(self) -> None:
         await self.stop()
@@ -98,6 +103,7 @@ class GuildPlaybackSession:
             task.cancel()
             with suppress(asyncio.CancelledError):
                 await task
+        await self._cancel_pending_seek()
         self._stop_voice_source()
         self.clock.clear()
         self.state = None
@@ -198,6 +204,7 @@ class GuildPlaybackSession:
             desired_ms = self._desired_position_ms(state)
 
             if not item_id:
+                await self._cancel_pending_seek()
                 self._stop_voice_source()
                 self.clock.clear()
                 self.position_stamp = position_stamp
@@ -211,6 +218,7 @@ class GuildPlaybackSession:
             )
 
             if track_changed:
+                await self._cancel_pending_seek()
                 self.position_stamp = position_stamp
                 if is_playing:
                     await self._restart_source(item_id, desired_ms)
@@ -232,6 +240,7 @@ class GuildPlaybackSession:
                 # Helix's authoritative paused position, not the old FFmpeg read
                 # position, because a paused Discord AudioPlayer does not seek.
                 if explicit_position_change:
+                    await self._cancel_pending_seek()
                     self._stop_voice_source()
                     self.clock.item_id = item_id
                     self.clock.position_ms = desired_ms
@@ -239,7 +248,13 @@ class GuildPlaybackSession:
                 return
 
             if explicit_position_change:
-                await self._restart_source(item_id, desired_ms)
+                self._schedule_seek_restart(item_id, desired_ms)
+                return
+
+            # While a seek is waiting for the user to finish scrubbing, ignore
+            # normal drift checks. The pending seek task will restart once at the
+            # newest requested position instead of thrashing FFmpeg repeatedly.
+            if self._seek_task is not None and not self._seek_task.done():
                 return
 
             if voice.is_paused():
@@ -265,6 +280,61 @@ class GuildPlaybackSession:
                 )
                 await self._restart_source(item_id, desired_ms)
 
+
+    async def _cancel_pending_seek(self) -> None:
+        task = self._seek_task
+        self._seek_task = None
+        self._pending_seek_item_id = ""
+        self._pending_seek_position_ms = 0
+        if task and task is not asyncio.current_task():
+            task.cancel()
+            with suppress(asyncio.CancelledError):
+                await task
+
+    def _schedule_seek_restart(self, item_id: str, position_ms: int) -> None:
+        self._pending_seek_item_id = item_id
+        self._pending_seek_position_ms = max(0, int(position_ms))
+
+        old_task = self._seek_task
+        if old_task and not old_task.done():
+            old_task.cancel()
+
+        self._seek_task = asyncio.create_task(
+            self._debounced_seek_restart(),
+            name=f"helixbot-seek-{self.guild_id}",
+        )
+
+    async def _debounced_seek_restart(self) -> None:
+        try:
+            await asyncio.sleep(SEEK_DEBOUNCE_SECONDS)
+            async with self._state_lock:
+                if self._stopping or self.binding is None:
+                    return
+
+                state = self.state or {}
+                now = state.get("now_playing") or {}
+                item_id = self._pending_seek_item_id
+                position_ms = self._pending_seek_position_ms
+
+                if (
+                    not item_id
+                    or str(now.get("id") or "") != item_id
+                    or not state.get("is_playing")
+                ):
+                    return
+
+                # Clear the task reference before restarting so _apply_state does
+                # not mistake this seek itself for an outstanding debounce.
+                self._seek_task = None
+                self._pending_seek_item_id = ""
+                self._pending_seek_position_ms = 0
+                await self._restart_source(item_id, position_ms)
+        except asyncio.CancelledError:
+            raise
+        finally:
+            if self._seek_task is asyncio.current_task():
+                self._seek_task = None
+
     def _stop_voice_source(self) -> None:
         voice = self._voice()
         if voice and (voice.is_playing() or voice.is_paused()):
@@ -286,6 +356,12 @@ class GuildPlaybackSession:
                 return
 
         self._stop_voice_source()
+        # discord.py tears down FFmpeg/AudioPlayer on a worker thread. Give the
+        # old source a moment to close its pipe before creating the replacement;
+        # otherwise rapid source swaps can overlap encoder/resampler teardown.
+        await asyncio.sleep(SOURCE_TEARDOWN_GRACE_SECONDS)
+        if self._stopping or voice is None or not voice.is_connected():
+            return
         self.generation += 1
         generation = self.generation
         seek_seconds = max(0.0, position_ms / 1000.0)
@@ -392,7 +468,7 @@ class GuildPlaybackSession:
 
 
 class PlaybackManager:
-    def __init__(self, bot: discord.Client, storage: Storage, helix: HelixClient, volume: float = 0.40) -> None:
+    def __init__(self, bot: discord.Client, storage: Storage, helix: HelixClient, volume: float = 0.10) -> None:
         self.bot = bot
         self.storage = storage
         self.helix = helix
